@@ -5,7 +5,7 @@ This is a custom BoxBilling module built for our resellers who would like to reg
 
 ## Installation
 1. Download the module via the following [link](https://github.com/ansoridev/Module-BoxBilling-GunaPedia)
-1. Copy the `Gunapedia.php` file into your `bb-library/Registrar/Adapter folder`.
+1. Copy the `Gunapedia.php` file into your `bb-library/Registrar/Adapter` folder.
 2. Install the GunaPedia domain registrar module through Configuration -> Domain registration -> New domain registrar
 3. Enter your API key at Configuration -> Domain registration -> Registrars -> GunaPeda. These can be obtained via your [client area](https://gunapedia.com/).
 4. Payment automatically charge your balances.
