@@ -164,8 +164,17 @@ class Registrar_Adapter_Gunapedia extends Registrar_AdapterAbstract
      */
     public function registerDomain(Registrar_Domain $domain)
     {
-        $this->_request("purchase/domain", ["domain={$domain->getName()}"], "POST");
-        return true;
+        try {
+            $result = $this->_request("purchase/domain", ["domain={$domain->getName()}"], "POST");
+            if ($result["status"] != "success"){
+                throw new Registrar_Exception("Error when register domain, Message: {$result["message"]}");
+                return false;
+            }
+            return true;
+        } catch (Exception $e){
+            throw new Registrar_Exception("Error when register domain, Message: {$e->getMessage()}");
+            return false;
+        }
     }
 
     /**
@@ -175,6 +184,7 @@ class Registrar_Adapter_Gunapedia extends Registrar_AdapterAbstract
      */
     public function renewDomain(Registrar_Domain $domain)
     {
+        throw new Registrar_Exception("Renew domain is not support for now, Renewal system is Auto Renew");
         return false;
     }
 
@@ -188,9 +198,13 @@ class Registrar_Adapter_Gunapedia extends Registrar_AdapterAbstract
         $payload = [
 			"domain" => $domain->getName()
 		];
-
-        $result = $this->_request('domain/update/privacy', $payload, "PUT");
-        return true;
+        try {
+            $result = $this->_request('domain/update/privacy', $payload, "PUT");
+            return true; 
+        } catch (Exception $e){
+            throw new Registrar_Exception("Error when editing domain privacy");
+            return false;
+        }
     }
 
     /**
@@ -271,7 +285,7 @@ class Registrar_Adapter_Gunapedia extends Registrar_AdapterAbstract
     public function getEpp(Registrar_Domain $domain)
     {
         $result = $this->_request("domain/data/info", ["domain={$domain->getName()}"], "POST")["data"];
-        return "EPP Code is: {$result["eppcode"]}";
+        return $result["eppcode"];
     }
     /**
      * Runs an api command and returns parsed data.
@@ -281,78 +295,70 @@ class Registrar_Adapter_Gunapedia extends Registrar_AdapterAbstract
      */
     private function _request($cmd, $body = [], $method)
     {
-        $body['api_key'] = $this->config['apikey'];
-
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $this->_getApiUrl() . $cmd);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-
-        // Set headers
-		$headers = [];
-		if ($method == "PUT") {
-			$headers[] = "Content-Type: application/json";
-			$body = json_encode($body);
-		} else {
-			$headers[] = "Content-Type: application/x-www-form-urlencoded";
-			$body = $body[0];
-		}
-        $headers[] = "Key: {$this->config['apikey']}";
-
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-		
-		// Set body
-		curl_setopt($ch, CURLOPT_POST, 1);
-		curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
-
-        $result = curl_exec($ch);
-
-        if ($result === false) {
-            $e = new Registrar_Exception(sprintf('CurlException: "%s"', curl_error($ch)));
-            $this->getLog()->err($e);
-            curl_close($ch);
-            throw $e;
-        }
-
-        try {
-            $json = json_decode($result, true);
-            $json["http_code"] = curl_getinfo($cURL, CURLINFO_HTTP_CODE);
-        } catch (Exception $e) {
-            throw new Registrar_Exception($e->getMessage());
-        }
-
-        $this->getLog()->debug($cmd);
-        $this->getLog()->debug(print_r($result, true));
-
-        $responseonseCode = (string)$json["http_code"];
-
-        if ($json["status"] != "Authentication success" || $json["status"] != "success"){
-            if ($json["status"] != "success") {
-                throw new Registrar_Exception("Error when ordering, Message: {$json["message"]}");
-            }
-            else if ($json["status"] != "Authentication success"){
-                throw new Registrar_Exception("Action Error, Please contact support (1) - Please update your API Key");
-            }   
+        # cek aktif g extensi curl nya
+        if (!extension_loaded("curl")) {
+            throw new Registrar_Exception("PHP extension curl must be loaded.");
         }
         
-        if ($json["status"] != "Authentication success"){
-            throw new Registrar_Exception("Action Error, Please contact support (1) - Please update your API Key");
-        } else if ($json["status"] != "success") {
-            throw new Registrar_Exception("Error when ordering, Message: {$json["message"]}");
-        } else if (!$json["status"]) {
-            throw new Registrar_Exception("Error, please contact support for futher information");
-        }
+        try {
+            $body['api_key'] = $this->config['apikey'];
 
-        if($responseonseCode[0] == 5) throw new Registrar_Exception("Fatal Error, Please contact support");;
-        if($responseonseCode == 401) throw new Registrar_Exception("Authenticaton Failed, please check your API Key");
-        if($responseonseCode == 403) throw new Registrar_Exception("Authorization Failed, please check your payload");
-        if($responseonseCode == 404) throw new Registrar_Exception("Not Found, Please check your Path");
-        if($responseonseCode == 500) throw new Registrar_Exception("Action Error, Please contact support (2)");
-        // if($responseonseCode[0] != 2) throw new Registrar_Exception("User Input Error, Please check your configuration");
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $this->_getApiUrl() . $cmd);
+            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+
+            // Set headers
+            $headers = [];
+            if ($method == "PUT") {
+                $headers[] = "Content-Type: application/json";
+                $body = json_encode($body);
+            } else {
+                $headers[] = "Content-Type: application/x-www-form-urlencoded";
+                $body = $body[0];
+            }
+            $headers[] = "Key: {$this->config['apikey']}";
+
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
             
-        curl_close($ch);
+            // Set body
+            curl_setopt($ch, CURLOPT_POST, 1);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
 
-        return $json;
+            $result = curl_exec($ch);
+
+            if ($result === false) {
+                $e = new Registrar_Exception(sprintf('CurlException: "%s"', curl_error($ch)));
+                $this->getLog()->err($e);
+                curl_close($ch);
+                throw $e;
+            }
+
+            try {
+                $json = json_decode($result, true);
+                $json["http_code"] = curl_getinfo($cURL, CURLINFO_HTTP_CODE);
+            } catch (Exception $e) {
+                throw new Registrar_Exception($e->getMessage());
+            }
+
+            $this->getLog()->debug($cmd);
+            $this->getLog()->debug(print_r($result, true));
+
+            $responseonseCode = (string)$json["http_code"];
+
+            if($responseonseCode[0] == 5) throw new Registrar_Exception("Fatal Error, Please contact support");
+            if($responseonseCode == 401) throw new Registrar_Exception("Authenticaton Failed, please check your API Key");
+            if($responseonseCode == 403) throw new Registrar_Exception("Authorization Failed, please check your payload");
+            if($responseonseCode == 404) throw new Registrar_Exception("Not Found, Please check your Path");
+            if($responseonseCode == 500) throw new Registrar_Exception("Action Error, Please contact support (2)");
+            // if($responseonseCode[0] != 2) throw new Registrar_Exception("User Input Error, Please check your configuration");
+                
+            curl_close($ch);
+
+            return $json;
+        } catch (Exception $e) {
+            throw new Registrar_Exception("Error when make cURL Request, Message: {$e->getMessage()}");
+        }
     }
 
     public function isTestEnv()
