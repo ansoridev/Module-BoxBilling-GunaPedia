@@ -297,7 +297,7 @@ class Registrar_Adapter_Gunapedia extends Registrar_AdapterAbstract
 			$headers[] = "Content-Type: application/x-www-form-urlencoded";
 			$body = $body[0];
 		}
-        $headers[] = "Key: {$body['api_key']}";
+        $headers[] = "Key: {$this->config['apikey']}";
 
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 		
@@ -326,8 +326,21 @@ class Registrar_Adapter_Gunapedia extends Registrar_AdapterAbstract
 
         $responseonseCode = (string)$json["http_code"];
 
-        if($json["status"] != "Authentication success" || !$json["status"]){
-            throw new Registrar_Exception("Action Error, Please contact support (1)");
+        if ($json["status"] != "Authentication success" || $json["status"] != "success"){
+            if ($json["status"] != "success") {
+                throw new Registrar_Exception("Error when ordering, Message: {$json["message"]}");
+            }
+            else if ($json["status"] != "Authentication success"){
+                throw new Registrar_Exception("Action Error, Please contact support (1) - Please update your API Key");
+            }   
+        }
+        
+        if ($json["status"] != "Authentication success"){
+            throw new Registrar_Exception("Action Error, Please contact support (1) - Please update your API Key");
+        } else if ($json["status"] != "success") {
+            throw new Registrar_Exception("Error when ordering, Message: {$json["message"]}");
+        } else if (!$json["status"]) {
+            throw new Registrar_Exception("Error, please contact support for futher information");
         }
 
         if($responseonseCode[0] == 5) throw new Registrar_Exception("Fatal Error, Please contact support");;
@@ -335,7 +348,7 @@ class Registrar_Adapter_Gunapedia extends Registrar_AdapterAbstract
         if($responseonseCode == 403) throw new Registrar_Exception("Authorization Failed, please check your payload");
         if($responseonseCode == 404) throw new Registrar_Exception("Not Found, Please check your Path");
         if($responseonseCode == 500) throw new Registrar_Exception("Action Error, Please contact support (2)");
-        if($responseonseCode[0] != 2) throw new Registrar_Exception("User Input Error, Please check your configuration");
+        // if($responseonseCode[0] != 2) throw new Registrar_Exception("User Input Error, Please check your configuration");
             
         curl_close($ch);
 
